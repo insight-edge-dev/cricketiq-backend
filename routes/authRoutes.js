@@ -317,4 +317,27 @@ router.post("/auth/set-name", requireAuth, async (req, res) => {
   return res.json({ success: true, displayName: name });
 });
 
+// ── DELETE /api/auth/account ──────────────────────────────────
+
+router.delete("/auth/account", requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  const phone  = req.user.phone;
+  try {
+    // Delete in order: tokens → favorites → otp → user
+    await supabase.from("refresh_tokens").delete().eq("user_id", userId);
+    await supabase.from("favorites").delete().eq("user_id", userId);
+    if (phone) await supabase.from("otp_requests").delete().eq("phone", phone);
+    const { error } = await supabase.from("app_users").delete().eq("id", userId);
+    if (error) {
+      console.error("[Auth] delete-account error:", error.message);
+      return res.status(500).json({ error: "Failed to delete account" });
+    }
+    console.log(`[Auth] account deleted — user ${userId}`);
+    return res.json({ success: true });
+  } catch (e) {
+    console.error("[Auth] delete-account error:", e.message);
+    return res.status(500).json({ error: "Failed to delete account" });
+  }
+});
+
 module.exports = router;
